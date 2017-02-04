@@ -1,2 +1,2 @@
 # IEEE-gestures
-android application build files
+android application java code files
