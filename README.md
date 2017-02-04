@@ -1,2 +1,2 @@
-# IEEE-guestures
+# IEEE-gestures
 android application build files
