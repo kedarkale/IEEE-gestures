@@ -4,13 +4,15 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
-import android.os.Message;
+//import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
@@ -19,17 +21,20 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.UUID;
-import java.util.logging.Handler;
+
 
 public class MainActivity extends AppCompatActivity {
 
     BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
     BluetoothDevice myDevice = null;
     BluetoothSocket mySocket = null;
-    Handler myHandler;
     OutputStream myOutputStream ;
     InputStream myInputStream ;
-    byte[] myBuffer;
+
+
+    //EXPERIMENTAL!!!
+    //Handler bluetoothIn;
+    //StringBuilder recDataString = new StringBuilder();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,8 +42,9 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
 
+
         if (bt==null){
-            Toast.makeText(this,"device does not support bluetooth",Toast.LENGTH_SHORT).show();
+            Toast.makeText(this," bluetooth not detected ",Toast.LENGTH_SHORT).show();
             finish();
         }
 
@@ -50,9 +56,31 @@ public class MainActivity extends AppCompatActivity {
                 startActivityForResult(enablebt, 1);
             }
 
-
-
         }
+
+        //EXPERIMENTAL !!!
+        /*bluetoothIn = new Handler() {
+            public void handleMessage(android.os.Message msg) {
+                if (msg.what == 0) {                                     //if message is what we want
+                    String readMessage = (String) msg.obj;               // msg.arg1 = bytes from connect thread
+                    recDataString.append(readMessage);
+
+
+                    String dataInPrint = recDataString.toString();      // extract string
+                    myDisplay.setText("Data Received = " + dataInPrint);
+                    int dataLength = dataInPrint.length();              //get length of data received
+                    myDisplay2.setText("String Length = " + String.valueOf(dataLength));
+
+
+                    recDataString.delete(0, recDataString.length());    //clear all string data
+                    // strIncom =" ";
+                    // dataInPrint = " ";
+
+                }
+            }
+        };*/
+
+
     }
 
     @Override
@@ -68,18 +96,17 @@ public class MainActivity extends AppCompatActivity {
 
                 listOfDevices.add(bd.getName()+"\n"+bd.getAddress()+"\n"+bd.getBluetoothClass());
 
-                if (bd.getName().equals("gestureglove")){
+                if (bd.getAddress().equals("22:22:87:9B:05:10")){
                     myDevice = bd;
                     try {
                         createSocket();
                     }
                     catch (IOException ioe){
                         Toast.makeText(this,"error , "+ioe,Toast.LENGTH_SHORT).show();
+                        Log.d("createsocket()",ioe.toString());
                     }
-                }
-                else {
-                    Toast.makeText(this,"gesture glove not found , shutting down...",Toast.LENGTH_SHORT).show();
-
+                    connectedThread connectedthread = new connectedThread();
+                    connectedthread.getData();
                 }
 
             }
@@ -94,7 +121,14 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        Toast.makeText(this,"BT enabled",Toast.LENGTH_SHORT).show();
+
+        if (requestCode==RESULT_OK) {
+            Toast.makeText(this, "BT enabled", Toast.LENGTH_SHORT).show();
+        }
+        else if (requestCode==RESULT_CANCELED){
+            Toast.makeText(this," permission denied ,exiting app",Toast.LENGTH_SHORT).show();
+            finish();
+        }
     }
 
     @Override
@@ -125,51 +159,93 @@ public class MainActivity extends AppCompatActivity {
 
     void createSocket () throws IOException{
 
+
+        bt.cancelDiscovery();
         UUID uuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
-        mySocket = myDevice.createInsecureRfcommSocketToServiceRecord(uuid);
-        mySocket.connect();
+        mySocket = myDevice.createRfcommSocketToServiceRecord(uuid);
+        try {
+            mySocket.connect();
+            Log.d("socket.connect()","socket connected");
+        }
+        catch (IOException e){
+            Toast.makeText(this,"socket connnection failed \n" + e,Toast.LENGTH_SHORT).show();
+            Log.d("socket.connect()",e.toString());
+
+            try {
+                Log.d("","trying fallback...");
+
+                mySocket =(BluetoothSocket) myDevice.getClass().getMethod("createRfcommSocket", new Class[] {int.class}).invoke(myDevice,1);
+                mySocket.connect();
+
+                Log.d("fallback","Connected");
+            }
+            catch (Exception e2) {
+                Log.d("", "Couldn't establish Bluetooth connection!");
+            }
+        }
         try {
             myOutputStream = mySocket.getOutputStream();
+            Log.d("socket.outputStream()","got output stream");
         }
         catch (IOException e){
             Toast.makeText(this,"error creating output socket , "+e,Toast.LENGTH_SHORT).show();
+            Log.d("socket.OutputStream()",e.toString());
         }
         try {
             myInputStream = mySocket.getInputStream();
+            Log.d("socket.inputStream()","got input stream");
         }
         catch (IOException e){
-            Toast.makeText(this,"error creating in put socket , "+e,Toast.LENGTH_SHORT).show();
+            Toast.makeText(this,"error creating input socket , "+e,Toast.LENGTH_SHORT).show();
+            Log.d("socket.inputStream()",e.toString());
         }
 
-        getData();
+
 
     }
 
-    void getData (){
+    public class connectedThread extends Thread {
+
+        TextView myDisplay1 = (TextView) findViewById(R.id.display);
+        //TextView myDisplay2 = (TextView) findViewById(R.id.displaytwo);
+
+        void getData() {
 
 
-            myBuffer = new byte[1024];
             int numBytes; // bytes returned from read()
+            byte[] myBuffer;//buffer for received data
 
             // Keep listening to the InputStream until an exception occurs.
             while (true) {
                 try {
-                    // Read from the InputStream.
-                    numBytes = myInputStream.read(myBuffer);
-                    // Send the obtained bytes to the UI activity.
-                    Message readMsg = myHandler.obtainMessage(0, numBytes, -1, myBuffer);
-                    readMsg.sendToTarget();
-                } catch (IOException e) {
-                    Toast.makeText(this,"error reading input stream , "+e,Toast.LENGTH_SHORT).show();
+
+                    myBuffer = new byte[256];
+
+                    if (myInputStream.available()!=0) {
+                        // Read from the InputStream.
+                        numBytes = myInputStream.read(myBuffer);
+                        // Send the obtained bytes to the UI activity.
+                        String tmp = new String(myBuffer, 0, numBytes);
+                        //bluetoothIn.obtainMessage(0, numBytes, -1, tmp);  EXPERIMENTAL !!!
+
+                        myDisplay1.setText(tmp);
+                        //myDisplay2.setText(Integer.toString(numBytes));
+                        Log.d("input", tmp+" "+numBytes);
+                    }
+
+                }
+                catch (IOException e) {
+                    Toast.makeText(MainActivity.this, "error reading input stream , " + e, Toast.LENGTH_SHORT).show();
+                    Log.d(".read()", e.toString());
                     break;
                 }
+                /*try {
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException ie){
+                    Log.d("thread.sleep",ie.toString());
+                }*/
             }
-
-
-
-
-
-
+        }
     }
-
 }
