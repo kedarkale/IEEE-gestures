@@ -4,7 +4,7 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
-//import android.os.Handler;
+import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -31,16 +31,20 @@ public class MainActivity extends AppCompatActivity {
     OutputStream myOutputStream ;
     InputStream myInputStream ;
 
+    final String MAC_ADDRESS = "22:22:87:9B:05:10";
+
 
     //EXPERIMENTAL!!!
-    //Handler bluetoothIn;
-    //StringBuilder recDataString = new StringBuilder();
+    Handler bluetoothIn;
+    StringBuilder recDataString = new StringBuilder();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        final TextView myDisplay1 = (TextView) findViewById(R.id.display);
+        final TextView myDisplay2 = (TextView) findViewById(R.id.displaytwo);
 
 
         if (bt==null){
@@ -54,22 +58,26 @@ public class MainActivity extends AppCompatActivity {
                 Intent enablebt = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
                 Toast.makeText(this, "enabling BT", Toast.LENGTH_SHORT).show();
                 startActivityForResult(enablebt, 1);
+
             }
 
         }
 
+
         //EXPERIMENTAL !!!
-        /*bluetoothIn = new Handler() {
+         bluetoothIn = new Handler() {
             public void handleMessage(android.os.Message msg) {
+
+                Log.d("in handler","IT WORKS!");
                 if (msg.what == 0) {                                     //if message is what we want
                     String readMessage = (String) msg.obj;               // msg.arg1 = bytes from connect thread
                     recDataString.append(readMessage);
 
 
                     String dataInPrint = recDataString.toString();      // extract string
-                    myDisplay.setText("Data Received = " + dataInPrint);
+                    myDisplay1.setText("Data = " + dataInPrint);
                     int dataLength = dataInPrint.length();              //get length of data received
-                    myDisplay2.setText("String Length = " + String.valueOf(dataLength));
+                    myDisplay2.setText("Length = " + String.valueOf(dataLength));
 
 
                     recDataString.delete(0, recDataString.length());    //clear all string data
@@ -78,7 +86,7 @@ public class MainActivity extends AppCompatActivity {
 
                 }
             }
-        };*/
+        };
 
 
     }
@@ -90,31 +98,37 @@ public class MainActivity extends AppCompatActivity {
         Set<BluetoothDevice> pairedDevices = bt.getBondedDevices();
         ArrayList<String> listOfDevices = new ArrayList<>();
 
-        if (pairedDevices.size()>0){
+        if (pairedDevices.size() > 0) {
 
-            for (BluetoothDevice bd : pairedDevices){
+            for (BluetoothDevice bd : pairedDevices) {
 
-                listOfDevices.add(bd.getName()+"\n"+bd.getAddress()+"\n"+bd.getBluetoothClass());
+                listOfDevices.add(bd.getName() + "\n" + bd.getAddress() + "\n" + bd.getBluetoothClass());
 
-                if (bd.getAddress().equals("22:22:87:9B:05:10")){
+                //change MAC as device to connect changes
+                if (bd.getAddress().equals(MAC_ADDRESS)) {
                     myDevice = bd;
+                    Log.d("myDevice initialized",myDevice.getName());
+
                     try {
                         createSocket();
+                    } catch (IOException ioe) {
+                        Toast.makeText(this, "error , " + ioe, Toast.LENGTH_SHORT).show();
+                        Log.d("createsocket()", ioe.toString());
                     }
-                    catch (IOException ioe){
-                        Toast.makeText(this,"error , "+ioe,Toast.LENGTH_SHORT).show();
-                        Log.d("createsocket()",ioe.toString());
-                    }
-                    connectedThread connectedthread = new connectedThread();
-                    connectedthread.getData();
+
+                    break;
+                }
+                else {
+                    Toast.makeText(this, "device not found , pair device first", Toast.LENGTH_SHORT).show();
                 }
 
             }
 
-            ArrayAdapter<String> arad = new ArrayAdapter<>(this,android.R.layout.simple_list_item_1,listOfDevices);
+            ArrayAdapter<String> arad = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, listOfDevices);
 
             deviceList.setAdapter(arad);
         }
+
 
         super.onResume();
     }
@@ -183,33 +197,44 @@ public class MainActivity extends AppCompatActivity {
                 Log.d("", "Couldn't establish Bluetooth connection!");
             }
         }
-        try {
-            myOutputStream = mySocket.getOutputStream();
-            Log.d("socket.outputStream()","got output stream");
-        }
-        catch (IOException e){
-            Toast.makeText(this,"error creating output socket , "+e,Toast.LENGTH_SHORT).show();
-            Log.d("socket.OutputStream()",e.toString());
-        }
-        try {
-            myInputStream = mySocket.getInputStream();
-            Log.d("socket.inputStream()","got input stream");
-        }
-        catch (IOException e){
-            Toast.makeText(this,"error creating input socket , "+e,Toast.LENGTH_SHORT).show();
-            Log.d("socket.inputStream()",e.toString());
-        }
 
 
-
+        connectedThread connectedthread = new connectedThread(mySocket);
+        connectedthread.start();
     }
 
-    public class connectedThread extends Thread {
+    private class connectedThread extends Thread {
 
-        TextView myDisplay1 = (TextView) findViewById(R.id.display);
-        //TextView myDisplay2 = (TextView) findViewById(R.id.displaytwo);
+        //constructor
+        private connectedThread (BluetoothSocket socket){
 
-        void getData() {
+            try {
+                myOutputStream = socket.getOutputStream();
+                Log.d("socket.outputStream()","got output stream");
+            }
+            catch (IOException e){
+                Log.d("socket.OutputStream()",e.toString());
+            }
+            try {
+                myInputStream = socket.getInputStream();
+                Log.d("socket.inputStream()","got input stream");
+            }
+            catch (IOException e){
+                Log.d("socket.inputStream()",e.toString());
+            }
+
+            try {
+                String gvalue = "x";
+                myOutputStream.write(gvalue.getBytes());
+                Log.d("out.write","wrote value on serial out");
+            }
+            catch (IOException e){
+                Log.d("out.write unsuccesful",e.toString());
+            }
+
+        }
+
+        public void run() {
 
 
             int numBytes; // bytes returned from read()
@@ -226,16 +251,15 @@ public class MainActivity extends AppCompatActivity {
                         numBytes = myInputStream.read(myBuffer);
                         // Send the obtained bytes to the UI activity.
                         String tmp = new String(myBuffer, 0, numBytes);
-                        //bluetoothIn.obtainMessage(0, numBytes, -1, tmp);  EXPERIMENTAL !!!
 
-                        myDisplay1.setText(tmp);
-                        //myDisplay2.setText(Integer.toString(numBytes));
+                        //calling handler
+                        bluetoothIn.obtainMessage(0, numBytes, -1, tmp).sendToTarget();
+
                         Log.d("input", tmp+" "+numBytes);
                     }
 
                 }
                 catch (IOException e) {
-                    Toast.makeText(MainActivity.this, "error reading input stream , " + e, Toast.LENGTH_SHORT).show();
                     Log.d(".read()", e.toString());
                     break;
                 }
