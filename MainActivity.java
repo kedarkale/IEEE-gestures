@@ -34,7 +34,7 @@ public class MainActivity extends AppCompatActivity {
     // ravi - "80:01:84:2F:D7:BF"
     //mt25i - "22:22:87:9B:05:10"
     //hc-05 - "98:D3:31:20:72:65"
-    final String MAC_ADDRESS = "22:22:87:9B:05:10";
+    final String MAC_ADDRESS = "98:D3:31:20:72:65";
 
 
     //EXPERIMENTAL!!!
@@ -141,10 +141,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 
-        if (requestCode==RESULT_OK) {
+        if (resultCode==RESULT_OK) {
             Toast.makeText(this, "BT enabled", Toast.LENGTH_SHORT).show();
         }
-        else if (requestCode==RESULT_CANCELED){
+        else if (resultCode==RESULT_CANCELED){
             Toast.makeText(this," permission denied ,exiting app",Toast.LENGTH_SHORT).show();
             finish();
         }
@@ -166,13 +166,18 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
 
-        try {
-            mySocket.close();
-        }catch (IOException ioe){
-            Toast.makeText(this,"unable to close bt socket , "+ioe,Toast.LENGTH_SHORT).show();
+        if (bt.isEnabled()) {
+
+            try {
+                mySocket.close();
+            } catch (IOException ioe) {
+                Toast.makeText(this, "unable to close bt socket , " + ioe, Toast.LENGTH_SHORT).show();
+            }
+            bt.disable();
+            Toast.makeText(this, "BT disabled", Toast.LENGTH_SHORT).show();
+
         }
-        bt.disable();
-        Toast.makeText(this,"BT disabled",Toast.LENGTH_SHORT).show();
+
         super.onDestroy();
 
     }
