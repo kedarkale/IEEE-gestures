@@ -31,6 +31,9 @@ public class MainActivity extends AppCompatActivity {
     OutputStream myOutputStream ;
     InputStream myInputStream ;
 
+    // ravi - "80:01:84:2F:D7:BF"
+    //mt25i - "22:22:87:9B:05:10"
+    //hc-05 - "98:D3:31:20:72:65"
     final String MAC_ADDRESS = "22:22:87:9B:05:10";
 
 
@@ -97,11 +100,13 @@ public class MainActivity extends AppCompatActivity {
         ListView deviceList = (ListView) findViewById(R.id.devicelist);
         Set<BluetoothDevice> pairedDevices = bt.getBondedDevices();
         ArrayList<String> listOfDevices = new ArrayList<>();
+        int c = 0;
 
         if (pairedDevices.size() > 0) {
 
             for (BluetoothDevice bd : pairedDevices) {
 
+                c++;
                 listOfDevices.add(bd.getName() + "\n" + bd.getAddress() + "\n" + bd.getBluetoothClass());
 
                 //change MAC as device to connect changes
@@ -112,13 +117,13 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         createSocket();
                     } catch (IOException ioe) {
-                        Toast.makeText(this, "error , " + ioe, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "device not found , " + ioe, Toast.LENGTH_SHORT).show();
                         Log.d("createsocket()", ioe.toString());
                     }
 
                     break;
                 }
-                else {
+                else if (c == pairedDevices.size()){
                     Toast.makeText(this, "device not found , pair device first", Toast.LENGTH_SHORT).show();
                 }
 
@@ -142,6 +147,19 @@ public class MainActivity extends AppCompatActivity {
         else if (requestCode==RESULT_CANCELED){
             Toast.makeText(this," permission denied ,exiting app",Toast.LENGTH_SHORT).show();
             finish();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        if (bt.isEnabled()) {
+            try {
+                mySocket.close();
+            } catch (IOException e) {
+                Log.d("onpause", "error while closing socket , " + e);
+            }
         }
     }
 
