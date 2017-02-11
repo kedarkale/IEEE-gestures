@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
 import android.os.Handler;
+import android.speech.tts.TextToSpeech;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -19,6 +20,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -30,11 +32,12 @@ public class MainActivity extends AppCompatActivity {
     BluetoothSocket mySocket = null;
     OutputStream myOutputStream ;
     InputStream myInputStream ;
+    TextToSpeech tts;
 
     // ravi - "80:01:84:2F:D7:BF"
     //mt25i - "22:22:87:9B:05:10"
     //hc-05 - "98:D3:31:20:72:65"
-    final String MAC_ADDRESS = "98:D3:31:20:72:65";
+    final String MAC_ADDRESS = "22:22:87:9B:05:10";
 
 
     //EXPERIMENTAL!!!
@@ -48,6 +51,15 @@ public class MainActivity extends AppCompatActivity {
 
         final TextView myDisplay1 = (TextView) findViewById(R.id.display);
         final TextView myDisplay2 = (TextView) findViewById(R.id.displaytwo);
+
+        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if (status!=TextToSpeech.ERROR){
+                    tts.setLanguage(Locale.US);
+                }
+            }
+        });
 
 
         if (bt==null){
@@ -64,6 +76,8 @@ public class MainActivity extends AppCompatActivity {
 
             }
 
+
+
         }
 
 
@@ -76,9 +90,18 @@ public class MainActivity extends AppCompatActivity {
                     String readMessage = (String) msg.obj;               // msg.arg1 = bytes from connect thread
                     recDataString.append(readMessage);
 
+                    String dataInPrint = recDataString.toString();
+                    // extract string
 
-                    String dataInPrint = recDataString.toString();      // extract string
-                    myDisplay1.setText("Data = " + dataInPrint);
+                    if (dataInPrint.equals("c") ) {
+                        myDisplay1.setText("");
+                    }
+                    else if (dataInPrint.equals("t")){
+                        tts.speak(myDisplay1.getText().toString(),TextToSpeech.QUEUE_FLUSH,null);
+                    }
+                    else{
+                        myDisplay1.setText(myDisplay1.getText() + dataInPrint);
+                    }
                     int dataLength = dataInPrint.length();              //get length of data received
                     myDisplay2.setText("Length = " + String.valueOf(dataLength));
 
@@ -121,9 +144,9 @@ public class MainActivity extends AppCompatActivity {
                         Log.d("createsocket()", ioe.toString());
                     }
 
-                    break;
+
                 }
-                else if (c == pairedDevices.size()){
+                else if (c == pairedDevices.size() && myDevice==null){
                     Toast.makeText(this, "device not found , pair device first", Toast.LENGTH_SHORT).show();
                 }
 
@@ -193,6 +216,8 @@ public class MainActivity extends AppCompatActivity {
         finish();
         return true;
     }
+
+
 
     void createSocket () throws IOException{
 
